@@ -134,6 +134,9 @@ public class ModProcessor {
 			@Override
 			protected String transform(ZipEntry zipEntry, String input) throws IOException {
 				JsonObject json = GSON.fromJson(input, JsonObject.class);
+				if (json.keySet().contains("_x_fabric_loom_dontstripjars")) {
+					return input;
+				}
 				json.remove("jars");
 				return GSON.toJson(json);
 			}
