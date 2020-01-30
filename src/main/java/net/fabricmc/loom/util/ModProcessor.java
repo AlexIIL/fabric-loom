@@ -40,6 +40,7 @@ import java.util.zip.ZipEntry;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.Project;
@@ -73,6 +74,10 @@ public class ModProcessor {
 
 		//Always strip the nested jars
 		stripNestedJars(output);
+	}
+
+	public static String getExpectedType(File input) {
+		return "nonstripped_jar_file\n";
 	}
 
 	private static void handleNestedJars(File input, Project project, Configuration config, ResolvedArtifact artifact) throws IOException {
@@ -134,7 +139,8 @@ public class ModProcessor {
 			@Override
 			protected String transform(ZipEntry zipEntry, String input) throws IOException {
 				JsonObject json = GSON.fromJson(input, JsonObject.class);
-				if (json.keySet().contains("_x_fabric_loom_dontstripjars")) {
+				JsonElement c = json.get("custom");
+				if (c != null && c.isJsonObject() && c.getAsJsonObject().has("_x_fabric_loom_dontstripjars")) {
 					return input;
 				}
 				json.remove("jars");
