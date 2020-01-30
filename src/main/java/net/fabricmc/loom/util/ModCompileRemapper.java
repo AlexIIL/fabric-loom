@@ -25,7 +25,12 @@
 package net.fabricmc.loom.util;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -123,7 +128,44 @@ public class ModCompileRemapper {
 
 	private static void remapArtifact(Project project, Configuration config, ResolvedArtifact artifact, String remappedFilename, File modStore) {
 		File input = artifact.getFile();
-		File output = new File(modStore, remappedFilename + ".jar");
+        File output = new File(modStore, remappedFilename + ".jar");
+        File outputTypeFile = new File(modStore, remappedFilename + ".jar.type");
+
+		String expectedStr = ModProcessor.getExpectedType(input);
+        byte[] expectedType = expectedStr == null ? null : expectedStr.getBytes(StandardCharsets.UTF_8);
+        if (expectedStr == null || expectedType == null) {
+            if (outputTypeFile.exists()) {
+                output.delete();
+            }
+        } else {
+            if (outputTypeFile.isFile()) {
+                try (InputStream is = new FileInputStream(outputTypeFile)) {
+                    byte[] holder = new byte[expectedType.length + 1];
+                    int offset = 0;
+                    while (true) {
+                        int read = is.read(holder, offset, holder.length - offset);
+                        if (read < 0) {
+                            break;
+                        }
+                        offset += read;
+                    }
+                    if (offset != expectedType.length) {
+                        output.delete();
+                    } else {
+                        for (int i = 0; i < expectedType.length; i++) {
+                            if (holder[i] != expectedType[i]) {
+                                output.delete();
+                                break;
+                            }
+                        }
+                    }
+                } catch (IOException io) {
+                    output.delete();
+                }
+            } else {
+                output.delete();
+            }
+        }
 
 		if (!output.exists() || input.lastModified() <= 0 || input.lastModified() > output.lastModified()) {
 			//If the output doesn't exist, or appears to be outdated compared to the input we'll remap it
@@ -138,6 +180,16 @@ public class ModCompileRemapper {
 			}
 
 			output.setLastModified(input.lastModified());
+
+			if (expectedType == null) {
+                outputTypeFile.delete();
+            } else {
+                try (OutputStream os = new FileOutputStream(outputTypeFile)) {
+                    os.write(expectedType);
+                } catch (IOException io) {
+                    project.getLogger().warn(output.getName() + " failed to write to " + outputTypeFile.getName(), io);
+                }
+            }
 		} else {
 			project.getLogger().info(output.getName() + " is up to date with " + input.getName());
 		}
