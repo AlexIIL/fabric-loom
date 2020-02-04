@@ -42,6 +42,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
@@ -77,7 +79,30 @@ public class ModProcessor {
 	}
 
 	public static String getExpectedType(File input) {
-		return "nonstripped_jar_file\n";
+		try (JarFile jf = new JarFile(input)) {
+			JarEntry modJsonEntry = jf.getJarEntry("fabric.mod.json");
+			if (modJsonEntry == null) {
+				return null;
+			}
+
+			try (InputStream is = jf.getInputStream(modJsonEntry)) {
+				JsonObject json = GSON.fromJson(new InputStreamReader(is), JsonObject.class);
+				if (json == null || !json.has("jars")) {
+					return null;
+				}
+				JsonArray jsonArray = json.getAsJsonArray("jars");
+				if (jsonArray.size() == 0) {
+					return null;
+				}
+				JsonElement c = json.get("custom");
+				if (c != null && c.isJsonObject() && c.getAsJsonObject().has("_x_fabric_loom_dontstripjars")) {
+					return "nonstripped_jar_file\n";
+				}
+			}
+			return null;
+		} catch (IOException | JsonParseException e) {
+			return "nonstripped_jar_file\n";
+		}
 	}
 
 	private static void handleNestedJars(File input, Project project, Configuration config, ResolvedArtifact artifact) throws IOException {
