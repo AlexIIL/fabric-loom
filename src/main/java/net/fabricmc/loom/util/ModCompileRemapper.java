@@ -133,6 +133,7 @@ public class ModCompileRemapper {
 
 		String expectedStr = ModProcessor.getExpectedType(input);
 		byte[] expectedType = expectedStr == null ? null : expectedStr.getBytes(StandardCharsets.UTF_8);
+
 		if (expectedStr == null || expectedType == null) {
 			if (outputTypeFile.exists()) {
 				output.delete();
@@ -142,13 +143,17 @@ public class ModCompileRemapper {
 				try (InputStream is = new FileInputStream(outputTypeFile)) {
 					byte[] holder = new byte[expectedType.length + 1];
 					int offset = 0;
+
 					while (true) {
 						int read = is.read(holder, offset, holder.length - offset);
+
 						if (read < 0) {
 							break;
 						}
+
 						offset += read;
 					}
+
 					if (offset != expectedType.length) {
 						output.delete();
 					} else {
